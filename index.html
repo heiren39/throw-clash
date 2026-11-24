@@ -59,6 +59,7 @@ const prism=()=>S.eq[8]?S.eq.filter(Boolean).length:0;
 const dmg=i=>(TY[i].dm??TY[i].d)+S.up[i][0]+prism(),dur=i=>TY[i].d+S.up[i][1]+(S.eq[0]?1+lv(0):0)+prism(),cost=i=>Math.max(0,SC[i]-S.up[i][2]);
 let P,E,pr,pt,pl=[],sk,over,ecd,sel=1,lt=0,begun=0;
 const R=(a,b)=>a+Math.random()*(b-a);
+let CM=1,TEST=0,SBP=.1;
 function reset(){const s=cur(),mh=30+3*(S.pl-1)+(S.eq[2]?8+4*lv(2):0)+3*prism(),sm=20+3*(S.pl-1)+3*prism(),eh=Math.round(s.hp*(1+.25*S.world)*(TEST?1:.75));
 P={hp:mh,max:mh,st:sm,sx:sm,vc:{},cd:TY.map(()=>0),h:0,bn:0,bt:0,ps:0};E={hp:eh,max:eh,boss:s.boss?1:0,cd:TY.map(()=>0),h:0,bn:0,bt:0,ps:0,n:s.n+(s.boss?' (boss)':'')+(S.world?' ★'+S.world:'')};pr=[];pt=[];pl=[];sk=0;over=0;ecd=2}
 reset();over=3;
@@ -133,7 +134,6 @@ function hitFx(p,tg){const t=TY[p.ti];let d=p.dm+(!t.fire&&tg.bn>0?tg.bn:0);if(p
 function wn(i){const u=S.up[i];if(i===8&&u[0]>=4&&u[1]>=4&&u[2]>=4&&u[3]>=4)return'World Rending Knife';return[RLN[u[3]-1],DU[u[1]-1],DM[u[0]-1],STN[u[2]-1],TY[i].n].filter(Boolean).join(' ')}
 const lv=i=>S.al[i]+(S.eq[10]&&i!==10?1+S.al[10]:0),vbn=()=>S.eq[10]?1+S.al[10]:0;
 const aeff=i=>['+'+(1+lv(0))+' durability','-'+(20+5*lv(1))+'% cooldowns','+'+(8+4*lv(2))+' HP','any weapon on low, mid or high','+'+(25+15*lv(4))+'% gold','poison '+(5+Math.min(3,S.al[5])+vbn())+'s, '+(2+Math.max(0,S.al[5]-3)+vbn())+'/tick, stacks x3',(10+5*lv(6))+'% lifesteal',(10+5*lv(7))+'% stamina steal','+'+Math.max(1,S.eq.filter(Boolean).length)+' to all stats','all weapons on the diagonal arc','+'+(1+S.al[10])+' levels to other accessories'][i];
-let CM=1,TEST=0,SBP=.1;
 let UC=[[40,80,150,300],[40,80,150,300],[50,100,200,500],[50,100,200,500]];
 function can(w,c){const L=S.up[w][c];if(w===8)return L<4&&S.up[8].slice(0,4).reduce((a,b)=>a+b,0)<Math.floor(S.up[8][4]/10);return L<4&&(L<3||!S.up[w].slice(0,4).some(v=>v>=4))}
 function upga(){const o=[];S.acc.forEach((v,i)=>{if(v&&S.al[i]<AMX[i])o.push(i)});if(!o.length)return'';const i=o[Math.floor(R(0,o.length))];S.al[i]++;return' Test upgrade: '+ACC[i].n+' Lv'+S.al[i]+'.'}
