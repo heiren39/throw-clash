@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Throw Clash Prototype</title>
+<style>
+:root{--bg:#e8ecf1;--fg:#161b22;--btn:#cfd7e1;--on:#1f8a7a;--mut:#4a5565;color-scheme:light dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12161c;--fg:#e8edf3;--btn:#262d38;--on:#2fb5a3;--mut:#9aa6b6}}
+:root[data-theme="dark"]{--bg:#12161c;--fg:#e8edf3;--btn:#262d38;--on:#2fb5a3;--mut:#9aa6b6}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;padding:12px}
+canvas{width:800px;max-width:100%;height:auto;border-radius:8px;touch-action:manipulation}
+.row{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:10px}
+button{font:inherit;background:var(--btn);color:var(--fg);border:0;border-radius:6px;padding:10px 14px;touch-action:manipulation;user-select:none;cursor:pointer}
+button.on{background:var(--on);color:#fff}
+button:focus-visible{outline:2px solid var(--on);outline-offset:2px}
+.arc{min-width:96px;font-weight:600}
+#bp{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(30,0,4,.8);z-index:9;padding:16px}#bp div{max-width:440px;background:linear-gradient(#3a060b,#1c0306);color:#ffdede;border:2px solid #b3122a;border-top:10px solid #b3122a;border-radius:12px;padding:18px;box-shadow:0 0 36px #b3122a}#bp h3{margin:0 0 8px;text-shadow:0 3px 6px #b3122a}
+#pn{display:none;max-width:640px;margin-top:12px;text-align:center}
+p{max-width:640px;color:var(--mut);margin:12px 0 0;text-align:center}
+</style></head><body>
+<canvas id="c" width="800" height="360" aria-label="Weapon throwing game"></canvas>
+<div class="row" id="wb"></div>
+<div class="row" id="ab"></div>
+<div id="pn"></div>
+<div id="bp"><div><h3>🩸 The Blood Dagger</h3><p style="color:inherit">It drinks what it spills. Every <b>10 throws</b> feeds it enough for <b>one more blacksmith upgrade</b>, in any category.</p><p style="color:inherit">Unlike every other weapon, it can reach <b>level 4 in damage, durability, stamina cost and reload speed</b>: 16 upgrades for 160 uses. It <b>cannot be upgraded without being used</b>. Max out damage, durability and stamina cost and its true form awakens.</p><button id="bpx">Understood</button></div></div><div id="ep" style="position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(4,6,18,.82);z-index:30;padding:16px"><div style="max-width:520px;text-align:center;background:linear-gradient(#1c1440,#0a0620);color:#e8edf3;border:2px solid #c9a227;border-top:10px solid #c9a227;border-radius:12px;padding:22px;box-shadow:0 0 44px rgba(201,162,39,.55)"><h3 id="ept" style="margin:0 0 10px;font-size:22px;text-shadow:0 0 16px rgba(255,200,80,.9)"></h3><p id="eps" style="color:#c3cadd;line-height:1.55;margin:0 0 14px"></p><button id="epx" style="font:inherit;background:#2a2350;color:#ffe9ad;border:0;border-radius:6px;padding:10px 20px;cursor:pointer">Continue</button></div></div>
+<p>Press a weapon (1–5) to throw it on its own arc. Weapons only clash with others on the same arc, so choose an arc to clash or to slip past. When two weapons clash, the one with higher durability wins and loses durability equal to what it broke. Equal durability breaks both. Damage and durability are separate stats: clashes use durability, hits use damage. The boomerang flies the diagonal arc (V) in an oval and only wears down when it hits another boomerang. It can’t be thrown again until it returns, but it’s ready the moment it does, and it takes 5 seconds to recharge if it breaks. R restarts, and H toggles the Scouter’s HP numbers once you have it.</p>
+<script>
+const cv=document.getElementById('c'),x=cv.getContext('2d'),G=300;
+const TY=[
+{n:'Dagger',arc:0,d:2,cd:1,sp:1.15,l:26,w:5,c:'#9fb4c7'},
+{n:'Sword',arc:1,d:4,cd:1.7,sp:1,l:38,w:7,c:'#d3dbe3'},
+{n:'Axe',arc:2,d:6,cd:2.6,sp:.88,l:34,w:13,c:'#c08a55',hd:1},
+{n:'Hammer',arc:2,d:9,cd:3.6,sp:.78,l:34,w:17,c:'#8f84b3',hd:1},
+{n:'Boomerang',arc:3,d:3,cd:5,sp:1.4,l:30,w:9,c:'#d9b04a',boom:1},
+{n:'Ninja Star',arc:0,dm:3,d:2,cd:1.2,sp:1.35,l:16,w:16,c:'#b8c2cc',star:1},
+{n:'Kunai',arc:0,dm:3,d:2,cd:1.5,sp:1.25,l:24,w:5,c:'#8ea0b2'},
+{n:'Torch',arc:1,dm:1,d:3,cd:1.8,sp:1,l:30,w:8,c:'#e8822a',fire:1},
+{n:'Blood Dagger',arc:0,dm:3,d:3,cd:.9,sp:1.3,l:28,w:6,c:'#b3122a'},
+{n:'Dagger',arc:0,d:2,cd:1,sp:1.15,l:26,w:5,c:'#9fb4c7'},
+{n:'Dagger',arc:0,d:2,cd:1,sp:1.15,l:26,w:5,c:'#9fb4c7'},
+{n:'Dagger',arc:0,d:2,cd:1,sp:1.15,l:26,w:5,c:'#9fb4c7'},
+{n:'Dagger',arc:0,d:2,cd:1,sp:1.15,l:26,w:5,c:'#9fb4c7'}];
+const SC=[4,6,8,10,6,4,4,6,4,4,4,4,4];
+const DM=['Sharp','Mono-Atomic','Space-Cutting','Vorpal'],DU=['Reinforced','Turtle','Adamant','Vajra'],STN=['Light','Air','Vacuum','Psychic'],RLN=['Fast','Alacritous','Quicksilver','Time-Bending'];
+const AR=[{n:'Low',T:.95,pk:18},{n:'Mid',T:1.5,pk:105},{n:'High',T:2.1,pk:200},{n:'Diagonal',T:1.1,pk:0,dg:1}];
+const EN=[
+{n:'Slime',hp:20,w:[0,1],a:[0,1],g:[2,3.4],gold:[5,10]},
+{n:'Archer',hp:24,w:[0,6,5],a:[0,2],g:[1.2,2],gold:[8,14]},
+{n:'Brute',hp:34,w:[1,2,3,7],a:[1,2],g:[2.4,3.8],gold:[12,20]},
+{n:'Warlord',hp:50,w:[0,1,2,3,4,5,6,7],a:[0,1,2,3],g:[1.5,2.6],gold:[40,60],boss:1}];
+const ACC=[{n:'Whetstone',t:'+1 durability on all weapons'},{n:'Quick Grip',t:'20% shorter cooldowns'},{n:'Iron Charm',t:'+8 max HP'},{n:'Arc Charm',t:'any weapon on low, mid or high'},{n:'Lucky Coin',t:'+25% gold'},{n:'Venom Charm',t:'your hits poison: 1 damage/sec for 5s'},{n:'Vampiric Charm',t:'heal 10% of damage dealt'},{n:'Siphon Charm',t:'steal 10% of damage as stamina'},{n:'Prism Charm',t:'+1 to all stats'},{n:'Boomerang Charm',t:'all weapons fly the diagonal arc'},{n:'Accessory’s Accessory',t:'boosts all other accessories'}];
+const AMX=[2,6,4,0,5,5,8,8,0,0,2];
+const SB={n:'Crimson Baron',hp:90,w:[0,1,2,3,4,5,6,7],a:[0],g:[1,1.7],gold:[120,160],boss:1,sb:1};
+function cur(){return S.sb?SB:EN[S.stage]}
+let S={gold:0,own:[1,1,0,0,1,0,0,0,0],ld:[0,1,4],lv:[0,0,0,0,0,0,0,0],acc:[1,0,0,0,0,0,0,0,0,0,0],eq:[1,0,0,0,0,0,0,0,0,0,0],ws:3,sa:1,pl:1,xp:0,relic:0,rv:1,rn:1,stage:0,world:0},pm='';
+S.up=TY.map(()=>[0,0,0,0,0]);S.bs=0;S.al=ACC.map(()=>0);S.as=0;
+const prism=()=>S.eq[8]?S.eq.filter(Boolean).length:0;
+const dmg=i=>(TY[i].dm??TY[i].d)+S.up[i][0]+prism(),dur=i=>TY[i].d+S.up[i][1]+(S.eq[0]?1+lv(0):0)+prism(),cost=i=>Math.max(0,SC[i]-S.up[i][2]);
+let P,E,pr,pt,pl=[],sk,over,ecd,sel=1,lt=0;
+const R=(a,b)=>a+Math.random()*(b-a);
+function reset(){const s=cur(),mh=30+3*(S.pl-1)+(S.eq[2]?8+4*lv(2):0)+3*prism(),sm=20+3*(S.pl-1)+3*prism(),eh=Math.round(s.hp*(1+.25*S.world));
+P={hp:mh,max:mh,st:sm,sx:sm,vc:{},cd:TY.map(()=>0),h:0,bn:0,bt:0,ps:0};E={hp:eh,max:eh,boss:s.boss?1:0,cd:TY.map(()=>0),h:0,bn:0,bt:0,ps:0,n:s.n+(s.boss?' (boss)':'')+(S.world?' ★'+S.world:'')};pr=[];pt=[];pl=[];sk=0;over=0;ecd=2}
+reset();
+function thr(o,ti,ai){const O=o?E:P,t=TY[ti],a=AR[ai];if(over||O.cd[ti]>0||(!o&&(!S.ld.includes(ti)||P.st<cost(ti)))||!(o?t.arc===ai:S.eq[9]?ai===3:S.eq[3]?(ai<3||t.boom):t.arc===ai))return;if(!o){P.st-=cost(ti);S.up[ti][4]++}O.cd[ti]=t.boom?999:t.cd*1.6*(o?1:[1,.85,.7,.55,.45][S.up[ti][3]])*(!o&&S.eq[1]?Math.max(.2,.8-.05*lv(1)):1);const T=a.T/t.sp,D=t.d+(o?0:S.up[ti][1]+(S.eq[0]?1+lv(0):0)+prism()+Math.floor(P.vc[ti]||0));if(!o)P.vc[ti]=0;
+pr.push({o,ti,ai,d:D,m:D,dm:(t.dm??t.d)+(o?0:S.up[ti][0]+prism()),fxv:!o&&S.up[ti][0]>=4,fxa:!o&&S.up[ti][1]>=4,fxp:o?!!(E.tel&&E.tel.ps):S.up[ti][2]>=4,dg:a.dg,dir:o?-1:1,x0:o?675:125,y0:250,T,pk:a.pk,vx:555/T,t:0,x:o?675:125,y:250,rot:0,vy:0,post:0,r:12+t.l/6,fl:0,sh:0});if(!o&&S.up[ti][3]>=4){const p=pr[pr.length-1],tpl=Object.assign({},p),c=Object.assign({},p);c.t=.25*p.T;step(c,0);pl.push({x:c.x,y:c.y,age:-Math.max(0,.25*p.T-.1),tpl,red:ti===8,earth:ti===8&&S.up[8][0]>=4&&S.up[8][1]>=4&&S.up[8][2]>=4&&S.up[8][3]>=4});p.tbd=.25*p.T}}
+function spark(px,py,n){for(let i=0;i<n;i++)pt.push({k:'s',x:px,y:py,vx:R(-220,220),vy:R(-260,60),life:.4})}
+function half(p,h){return{k:'h',h,ti:p.ti,x:p.x,y:p.y,rot:p.rot,vx:R(-140,140)+(h===1?60:-60),vy:R(-260,-80),vr:R(-8,8),life:1.4,d:1,m:1,fl:0,sh:0}}
+function brk(p){p.dead=1;if(TY[p.ti].boom)(p.o?E:P).cd[p.ti]=TY[p.ti].cd;pt.push(half(p,0),half(p,1))}
+function clash(a,b){spark((a.x+b.x)/2,(a.y+b.y)/2,14);sk=.2;
+if(a.d>b.d){a.d-=b.d;a.fl=a.sh=.35;brk(b)}else if(b.d>a.d){b.d-=a.d;b.fl=b.sh=.35;brk(a)}else{brk(a);brk(b)}}
+function arcY(p,u){return p.dg?p.y0+20-60*u:p.y0-4*p.pk*u*(1-u)}
+function step(p,dt){p.t+=dt;const bm=TY[p.ti].boom;
+if(bm){const T=p.T,b=p.t>T,tt=Math.max(0,b?2*T-p.t:p.t),u=tt/T;p.x=p.x0+p.dir*p.vx*tt;p.y=p.y0+(b?-14:14)*Math.sin(Math.PI*u);p.sc=1+(b?-.35:.85)*Math.sin(Math.PI*u);if(p.t>=2*T){p.dead=1;const O=p.o?E:P;O.cd[p.ti]=0}}
+else if(p.t<=p.T){const u=p.t/p.T;p.x=p.x0+p.dir*p.vx*p.t;p.y=arcY(p,u);if(p.dg)p.sc=1+.85*Math.sin(Math.PI*u)}
+else{if(!p.post){p.post=1;p.vy=4*p.pk/p.T}p.x+=p.dir*p.vx*dt;p.vy+=1400*dt;p.y+=p.vy*dt}
+p.rot+=p.dir*(bm?20:TY[p.ti].star?16:9)*dt;p.fl=Math.max(0,p.fl-dt);p.sh=Math.max(0,p.sh-dt)}
+function upd(dt){
+for(const O of[P,E]){O.cd=O.cd.map(v=>Math.max(0,v-dt));O.h=Math.max(0,O.h-dt);if(O.bt>0&&(O.bt-=dt)<=0)O.bn=0;if(O.ps>0){O.ps-=dt;if(O.ps<=0)O.pst=0;O.pa=(O.pa||0)+dt;if(O.pa>=1){O.pa--;O.hp-=(O.pd||1)*(O.pst||1)}}}
+sk=Math.max(0,sk-dt);P.st=Math.min(P.sx,P.st+5*dt);for(const w of S.ld)if(S.up[w][1]>=4&&P.cd[w]<=0)P.vc[w]=Math.min(10,(P.vc[w]||0)+dt);
+if(!over){if(E.tel&&(E.tel.t-=dt)<=0){thr(1,E.tel.w,TY[E.tel.w].arc);E.tel=0}ecd-=dt;if(ecd<=0){const s=cur(),rdy=s.w.filter(i=>E.cd[i]<=0);if(rdy.length){const w=rdy[Math.floor(R(0,rdy.length))];E.tel={w,t:.7,ps:E.boss&&Math.random()<.5}}ecd=R(s.g[0],s.g[1])}}
+for(const p of pr){if(p.dead)continue;step(p,dt);if(p.tbd&&p.t>=p.tbd){p.dead=1;continue}
+const tg=p.o?P:E,rx=p.o?60:680;
+if(!p.hit&&p.x>rx-p.r&&p.x<rx+60+p.r&&p.y>200-p.r&&p.y<G+p.r){hitFx(p,tg);tg.h=.25;sk=.25;spark(p.x,p.y,8);if(TY[p.ti].boom){p.hit=1;p.fl=.2;if(p.t<p.T)p.t=2*p.T-p.t}else p.dead=1}
+else if(p.y>G){p.dead=1;pt.push({k:'h',h:-1,ti:p.ti,x:p.x,y:G,rot:p.rot,vx:p.dir*40,vy:-150,vr:p.dir*3,life:1.2,d:p.d,m:p.m,fl:0,sh:0})}}
+for(const q of pl){const a0=q.age;q.age+=dt;for(const s of(q.earth?[.18,.25,.32]:[.2,.3]))if(a0<s&&q.age>=s){const c=Object.assign({},q.tpl);c.t=.25*c.T;step(c,0);pr.push(c)}}pl=pl.filter(q=>q.age<.4);
+for(let i=0;i<pr.length;i++)for(let j=i+1;j<pr.length;j++){const a=pr[i],b=pr[j];
+if(a.dead||b.dead||a.o===b.o||a.ai!==b.ai||!a.fxp!==!b.fxp||!TY[a.ti].boom!==!TY[b.ti].boom)continue;
+if(Math.hypot(a.x-b.x,a.y-b.y)<a.r+b.r)clash(a,b)}
+pr=pr.filter(p=>!p.dead);
+for(const q of pt){q.life-=dt;q.x+=q.vx*dt;q.y+=q.vy*dt;q.vy+=1400*dt;
+if(q.k==='h'){q.rot+=q.vr*dt;if(q.y>G+12){q.y=G+12;q.vy*=-.25;q.vx*=.5;q.vr*=.5}}}
+pt=pt.filter(q=>q.life>0);
+if(!over&&(P.hp<=0||E.hp<=0)){over=E.hp<=0?1:2;endB()}}
+function dw(o,h){const t=TY[o.ti];x.save();const hn=Date.now(),rb='hsl('+(hn/3%360)+',100%,62%)',cc=o.fxa?'#c8932e':o.fxp?rb:(o.fxv&&((hn/70|0)%2))?'#cfe8ff':t.c;if(o.fxp){x.shadowColor=rb;x.shadowBlur=14;x.globalAlpha*=.6}
+x.translate(o.x+(o.sh>0?R(-3,3):0),o.y+(o.sh>0?R(-3,3):0));x.rotate(o.rot);x.scale(o.sc||1,o.sc||1);
+if(h===0||h===1){x.beginPath();x.rect(h?0:-60,-40,60,80);x.clip()}
+if(t.star){x.fillStyle=cc;x.fillRect(-8,-3,16,6);x.fillRect(-3,-8,6,16)}else if(t.boom){x.fillStyle=cc;x.fillRect(-t.l/2,-3,t.l,6);x.fillRect(-t.l/2,-3,6,t.l/1.5)}else if(t.hd){x.fillStyle='#6b4a2c';x.fillRect(-t.l/2,-2,t.l,4);x.fillStyle=cc;x.fillRect(t.l/2-t.w,-t.w*.9,t.w,t.w*1.8)}
+else{if(o.fxa&&o.fxp&&o.fxv){x.fillStyle='#c8932e';x.fillRect(-t.l/2,-t.w/2,t.l/2,t.w);x.fillStyle=rb;x.fillRect(0,-t.w/2,t.l/2,t.w);if((hn/70|0)%2){x.fillStyle='rgba(255,255,255,.7)';x.fillRect(-t.l/2,-t.w/2,t.l,t.w)}}else{x.fillStyle=cc;x.fillRect(-t.l/2,-t.w/2,t.l,t.w)}x.fillStyle='#6b4a2c';x.fillRect(-t.l/2-9,-3,9,6)}
+const cr=Math.min(5,Math.floor((1-o.d/o.m)*5));x.strokeStyle='#14181f';x.lineWidth=1.5;
+for(let i=0;i<cr;i++){const s=-t.l/2+4+i*t.l/6;x.beginPath();x.moveTo(s,-t.w/2);x.lineTo(s+4,0);x.lineTo(s-1,t.w/2);x.stroke()}
+if(o.fl>0){x.fillStyle='rgba(255,255,255,.8)';x.fillRect(-t.l/2-9,-t.w,t.l+9,t.w*2)}
+x.restore();
+if(o.r){x.fillStyle='#fff';x.font='bold 12px system-ui';x.textAlign='center';x.fillText(o.d,o.x,o.y-o.r-8)}}
+function fig(cx,c,h){x.fillStyle=h>0?'#fff':c;x.fillRect(cx-22,G-70,44,70);x.beginPath();x.arc(cx,G-84,16,0,7);x.fill();if(cx===90&&S.relic&&S.rv){x.save();x.fillStyle='#38e060';x.shadowColor='#38e060';x.shadowBlur=10;x.fillRect(cx+1,G-92,13,13);x.restore()}}
+function bar(px,w,v,left){x.fillStyle='#0009';x.fillRect(px,16,w,14);x.fillStyle=left?'#4fb3d9':'#e0675a';
+const f=w*Math.max(0,v)/(left?P.max:E.max);x.fillRect(left?px:px+w-f,16,f,14)}
+function draw(){x.save();x.clearRect(0,0,800,360);
+const g=x.createLinearGradient(0,0,0,G);g.addColorStop(0,'#1e2a40');g.addColorStop(1,'#b9825a');
+x.fillStyle=g;x.fillRect(0,0,800,G);x.fillStyle='#2f2a26';x.fillRect(0,G,800,60);
+if(sk>0)x.translate(R(-4,4),R(-4,4));
+fig(90,'#4a8fd6',P.h);fig(710,'#d65a4a',E.h);
+for(const[O,cx]of[[P,90],[E,710]]){x.font='16px system-ui';x.textAlign='center';x.fillStyle='#fff';if(O.ps>0)x.fillText('☠️',cx-14,G-112);if(O.pst>1)x.fillText('x'+O.pst,cx-14,G-96);if(O.bn>0)x.fillText('🔥'+O.bn,cx+12,G-112)}
+if(E.tel){const t=TY[E.tel.w],tn=(E.tel.ps?'Psychic ':'')+t.n;x.fillStyle='rgba(0,0,0,.7)';x.fillRect(620,G-170,180,24);x.fillStyle='#fff';x.font='bold 12px system-ui';x.textAlign='center';x.fillText(tn+' · '+AR[t.arc].n,710,G-153)}
+for(const q of pt){x.globalAlpha=Math.min(1,q.life*2);
+if(q.k==='s'){x.fillStyle='#ffd27a';x.fillRect(q.x,q.y,3,3)}else if(q.k==='f'){x.fillStyle='rgba(190,225,255,.85)';x.beginPath();x.arc(q.x,q.y,18,0,7);x.fill()}else dw(q,q.h<0?undefined:q.h)}
+x.globalAlpha=1;pr.forEach(p=>dw(p));
+for(const q of pl){if(q.age<0)continue;const s=q.age<.1?q.age/.1:q.age<.3?1:(.4-q.age)/.1,r=26*s,hn=Date.now()/400;x.save();x.translate(q.x,q.y);if(q.earth){x.lineWidth=3;x.strokeStyle='rgba(150,215,255,.95)';x.shadowColor='#6ec6ff';x.shadowBlur=18;x.fillStyle='#10408f';x.beginPath();x.arc(0,0,r,0,7);x.fill();x.stroke();x.save();x.beginPath();x.arc(0,0,r,0,7);x.clip();x.fillStyle='#2f8f4a';x.beginPath();x.ellipse(-r*.42,-r*.24,r*.46,r*.3,.5,0,7);x.fill();x.beginPath();x.ellipse(r*.36,r*.32,r*.4,r*.28,-.4,0,7);x.fill();x.beginPath();x.ellipse(r*.06,-r*.56,r*.3,r*.17,.1,0,7);x.fill();x.fillStyle='rgba(255,255,255,.5)';x.beginPath();x.ellipse(-r*.12,r*.1,r*.52,r*.12,.25,0,7);x.fill();x.beginPath();x.ellipse(r*.42,-r*.2,r*.3,r*.1,-.2,0,7);x.fill();const eg=x.createRadialGradient(-r*.4,-r*.35,r*.1,0,0,r*1.25);eg.addColorStop(0,'rgba(255,255,255,.2)');eg.addColorStop(.55,'rgba(0,0,0,0)');eg.addColorStop(1,'rgba(2,8,35,.65)');x.fillStyle=eg;x.beginPath();x.arc(0,0,r,0,7);x.fill();x.restore()}else{x.strokeStyle=q.red?'#ff4d5e':'#7fe8ff';x.shadowColor=q.red?'#ff4d5e':'#7fe8ff';x.shadowBlur=14;x.lineWidth=3;x.fillStyle=q.red?'rgba(120,18,28,.55)':'rgba(20,40,90,.55)';x.beginPath();x.arc(0,0,r,0,7);x.fill();x.stroke();for(let k=0;k<12;k++){const a=k*Math.PI/6;x.beginPath();x.moveTo(Math.cos(a)*r*.82,Math.sin(a)*r*.82);x.lineTo(Math.cos(a)*r*.95,Math.sin(a)*r*.95);x.stroke()}x.beginPath();x.moveTo(0,0);x.lineTo(Math.cos(hn)*r*.7,Math.sin(hn)*r*.7);x.moveTo(0,0);x.lineTo(Math.cos(hn/12)*r*.45,Math.sin(hn/12)*r*.45);x.stroke()}x.restore()}
+bar(20,280,P.hp,1);bar(500,280,E.hp,0);x.fillStyle='#0009';x.fillRect(20,34,280,8);x.fillStyle='#f2c94c';x.fillRect(20,34,280*P.st/P.sx,8);x.fillStyle='#fff';x.font='13px system-ui';x.textAlign='right';x.fillText(E.n,780,46);if(S.relic&&S.rn){x.font='bold 12px system-ui';x.textAlign='left';x.fillText(Math.ceil(Math.max(0,P.hp))+' / '+P.max,26,27);x.textAlign='right';x.fillText(Math.ceil(Math.max(0,E.hp))+' / '+E.max,774,27)}
+if(over&&over<3){x.fillStyle='rgba(0,0,0,.55)';x.fillRect(0,0,800,360);x.fillStyle='#fff';x.textAlign='center';
+x.font='bold 36px system-ui';x.fillText(over===1?'You win':'You lose',400,170);
+x.font='16px system-ui';x.fillText('Tap here or press Enter to fight on',400,205)}
+x.restore()}
+const wb=document.getElementById('wb'),ab=document.getElementById('ab'),wbs=[];
+function setSel(i){if(S.ld[i]===undefined)return;sel=i;wbs.forEach((b,k)=>b.classList.toggle('on',k===i))}
+for(let i=0;i<5;i++){const b=document.createElement('button');
+b.onpointerdown=e=>{e.preventDefault();pick(i)};wb.appendChild(b);wbs.push(b)}
+AR.forEach((a,i)=>{const b=document.createElement('button');b.className='arc';b.textContent='ZXCV'[i]+' '+a.n;
+b.onpointerdown=e=>{e.preventDefault();thr(0,S.ld[sel],i)};ab.appendChild(b)});
+setSel(1);
+const pn=document.getElementById('pn');
+function hitFx(p,tg){const t=TY[p.ti];let d=p.dm+(!t.fire&&tg.bn>0?tg.bn:0);if(p.fxv&&Math.random()<.1){if(tg.boss)d=Math.round(d*1.5);else d=9999;pt.push({k:'f',x:p.x,y:p.y,life:.5})}else if(p.fxv)pt.push({k:'f',x:p.x,y:p.y,life:.25});const dd=Math.min(d,Math.max(0,tg.hp));tg.hp-=d;if(!p.o){if(S.eq[6])P.hp=Math.min(P.max,P.hp+dd*(.1+.05*lv(6)));if(S.eq[7])P.st=Math.min(P.sx,P.st+dd*(.1+.05*lv(7)))}if(t.fire){tg.bn=Math.min(5,(tg.bn||0)+1);tg.bt=8}if(!p.o&&S.eq[5]){const vb=vbn();tg.ps=5+Math.min(3,S.al[5])+vb;tg.pd=2+Math.max(0,S.al[5]-3)+vb;tg.pst=Math.min(3,(tg.pst||0)+1)}}
+function wn(i){const u=S.up[i];if(i===8&&u[0]>=4&&u[1]>=4&&u[2]>=4&&u[3]>=4)return'World Rending Knife';return[RLN[u[3]-1],DU[u[1]-1],DM[u[0]-1],STN[u[2]-1],TY[i].n].filter(Boolean).join(' ')}
+const lv=i=>S.al[i]+(S.eq[10]&&i!==10?1+S.al[10]:0),vbn=()=>S.eq[10]?1+S.al[10]:0;
+const aeff=i=>['+'+(1+lv(0))+' durability','-'+(20+5*lv(1))+'% cooldowns','+'+(8+4*lv(2))+' HP','any weapon on low, mid or high','+'+(25+15*lv(4))+'% gold','poison '+(5+Math.min(3,S.al[5])+vbn())+'s, '+(2+Math.max(0,S.al[5]-3)+vbn())+'/tick, stacks x3',(10+5*lv(6))+'% lifesteal',(10+5*lv(7))+'% stamina steal','+'+Math.max(1,S.eq.filter(Boolean).length)+' to all stats','all weapons on the diagonal arc','+'+(1+S.al[10])+' levels to other accessories'][i];
+const CM=.1,TEST=1,SBP=TEST?.5:.1;
+const UC=[[40,80,150,300],[40,80,150,300],[50,100,200,500],[50,100,200,500]].map(r=>r.map(v=>Math.max(1,Math.round(v*CM))));
+function can(w,c){const L=S.up[w][c];if(w===8)return L<4&&S.up[8].slice(0,4).reduce((a,b)=>a+b,0)<Math.floor(S.up[8][4]/10);return L<4&&(L<3||!S.up[w].slice(0,4).some(v=>v>=4))}
+function upga(){const o=[];S.acc.forEach((v,i)=>{if(v&&S.al[i]<AMX[i])o.push(i)});if(!o.length)return'';const i=o[Math.floor(R(0,o.length))];S.al[i]++;return' Test upgrade: '+ACC[i].n+' Lv'+S.al[i]+'.'}
+function upg(){const o=[];for(let w=0;w<TY.length;w++)if(S.own[w])for(let c=0;c<4;c++)if(can(w,c))o.push([w,c]);if(!o.length)return'';const[w,c]=o[Math.floor(R(0,o.length))];S.up[w][c]++;return' Test upgrade: '+wn(w)+'.'}
+function labels(){wbs.forEach((b,k)=>{const w=S.ld[k];b.style.display=w===undefined?'none':'';if(w!==undefined)b.textContent=(k+1)+' '+wn(w)+' '+dmg(w)+'dmg/'+dur(w)+'dur '+AR[S.eq[9]?3:TY[w].arc].n+' · '+cost(w)+' st'})}
+function pick(k){setSel(k);const w=S.ld[k];if(w!==undefined&&(S.eq[9]||!S.eq[3]))thr(0,w,S.eq[9]?3:TY[w].arc)}
+labels();
+function showPanel(m){pm=m;wb.style.display=ab.style.display='none';pn.style.display='block';
+let h='<b>'+m+'</b><div class="row"><button id="go">Fight: '+EN[S.stage].n+(EN[S.stage].boss?' (boss)':'')+'</button></div>Gold: '+S.gold+' · Level '+S.pl+' ('+S.xp+'/'+20*S.pl+' XP)<br><small>Weapons '+S.ld.length+'/'+S.ws+', accessories '+S.eq.filter(Boolean).length+'/'+S.sa+'</small><div class="row">';
+TY.forEach((t,i)=>{if(S.own[i])h+='<button data-w="'+i+'" class="'+(S.ld.includes(i)?'on':'')+'">'+(S.ld.includes(i)?(S.ld.indexOf(i)+1)+'. ':'')+wn(i)+' '+dmg(i)+'dmg/'+dur(i)+'dur '+cost(i)+'st '+AR[t.arc].n+'</button>'});
+h+='</div><div class="row">';
+ACC.forEach((a,i)=>{if(S.acc[i])h+='<button data-a="'+i+'" class="'+(S.eq[i]?'on':'')+'">'+a.n+(S.al[i]?' Lv'+S.al[i]:'')+': '+aeff(i)+'</button>'});
+const s=EN[S.stage];
+{const ow=TY.map((_,i)=>i).filter(i=>S.own[i]);if(!S.own[S.bs])S.bs=ow[0];const w=S.bs;h+='</div><div class="row"><b>Blacksmith</b> <select data-bs>'+ow.map(i=>'<option value="'+i+'"'+(i===w?' selected':'')+'>'+wn(i)+'</option>').join('')+'</select>';['Damage','Durability','Stamina cost','Reload speed'].forEach((nm,c)=>{const L=S.up[w][c],pf=[DM,DU,STN,RLN][c][L];h+='<button data-u="'+c+'">'+nm+': '+(L>=4?'MAX':!can(w,c)?(w===8?'needs more uses':'one level-4 per weapon'):pf+' ('+UC[c][L]+' gold)')+'</button>'});if(w===8){const sp=S.up[8].slice(0,4).reduce((a,b)=>a+b,0);h+=' <small>Blood: '+S.up[8][4]+' uses, '+Math.max(0,Math.floor(S.up[8][4]/10)-sp)+' upgrades ready</small> <button data-info="1">How it works</button>'}}
+{const oa=[0,1,2,3,4,5,6,7,8,9,10].filter(i=>S.acc[i]);if(oa.length){if(!S.acc[S.as])S.as=oa[0];const a=S.as,L=S.al[a],cs=Math.max(1,Math.round((30+30*L)*CM));h+='</div><div class="row"><b>Accessory smith</b> <select data-as>'+oa.map(i=>'<option value="'+i+'"'+(i===a?' selected':'')+'>'+ACC[i].n+' Lv'+S.al[i]+'</option>').join('')+'</select><button data-x="1">'+(AMX[a]===0?'No upgrades':L>=AMX[a]?'MAX':'Upgrade to Lv'+(L+1)+' ('+cs+' gold)')+'</button>'}}
+h+='</div><div class="row">'+(S.ws<5?'<button data-s="w">Weapon slot ('+Math.max(1,Math.round(100*(S.ws-2)*CM))+' gold)</button>':'')+(S.sa<5?'<button data-s="a">Accessory slot ('+Math.max(1,Math.round(60*S.sa*CM))+' gold)</button>':'')+(S.relic?'</div><div class="row"><button data-r="v" class="'+(S.rv?'on':'')+'">Scouter: green visor</button><button data-r="n" class="'+(S.rn?'on':'')+'">Scouter: HP numbers</button>':'')+'</div><div class="row"><button id="go">Fight: '+s.n+(s.boss?' (boss)':'')+'</button></div>';pn.innerHTML=h}
+pn.onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.id==='go')return go();
+if(b.dataset.w!==undefined){const i=+b.dataset.w;if(S.ld.includes(i))S.ld=S.ld.filter(v=>v!==i);else if(S.ld.length<S.ws)S.ld.push(i)}
+if(b.dataset.a!==undefined){const i=+b.dataset.a;if(S.eq[i])S.eq[i]=0;else if(S.eq.filter(Boolean).length<S.sa)S.eq[i]=1}
+if(b.dataset.info)pop();if(b.dataset.r==='v')S.rv=!S.rv;if(b.dataset.r==='n')S.rn=!S.rn;
+if(b.dataset.s==='w'&&S.ws<5){const c=Math.max(1,Math.round(100*(S.ws-2)*CM));if(S.gold>=c){S.gold-=c;S.ws++}}
+if(b.dataset.s==='a'&&S.sa<5){const c=Math.max(1,Math.round(60*S.sa*CM));if(S.gold>=c){S.gold-=c;S.sa++}}
+if(b.dataset.u!==undefined){const c=+b.dataset.u,w=S.bs,L=S.up[w][c];if(can(w,c)&&S.gold>=UC[c][L]){S.gold-=UC[c][L];S.up[w][c]++;labels();if(w===8&&S.up[8][0]>=4&&S.up[8][1]>=4&&S.up[8][2]>=4&&S.up[8][3]>=4)evolve()}}
+if(b.dataset.x){const a=S.as,L=S.al[a],cs=Math.max(1,Math.round((30+30*L)*CM));if(L<AMX[a]&&S.gold>=cs){S.gold-=cs;S.al[a]++}}
+showPanel(pm)};
+pn.onchange=e=>{if(e.target.dataset.bs!==undefined){S.bs=+e.target.value;showPanel(pm)}if(e.target.dataset.as!==undefined){S.as=+e.target.value;showPanel(pm)}};
+const bpe=document.getElementById('bp');function pop(){bpe.style.display='flex'}
+const ep=document.getElementById('ep');function evolve(){const t=document.getElementById('ept'),s2=document.getElementById('eps'),b=document.getElementById('epx');ep.style.display='flex';b.style.display='none';t.textContent='The Blood Dagger is evolving…';s2.textContent='Sixteen upgrades, one blade. The red clock dissolves and the Earth takes its place.';setTimeout(()=>{t.textContent='EVOLVED: WORLD RENDING KNIFE';s2.textContent='All prefixes gone — only the knife that rends the world remains. Its portal opens the Earth and looses three blades.';b.style.display='';},1600)}document.getElementById('epx').onclick=()=>ep.style.display='none';
+document.getElementById('bpx').onclick=()=>{bpe.style.display='none'};
+cv.onpointerdown=()=>{if(over)go()};
+function go(){pn.style.display='none';wb.style.display=ab.style.display='';if(!S.ld.length)S.ld.push(S.own.indexOf(1));setSel(0);labels();reset()}
+function endB(){let m='Defeated. Adjust your loadout and retry.';
+if(over===1){const s=cur(),g=Math.round(R(s.gold[0],s.gold[1])*(1+.25*S.world)*(S.eq[4]?1.25+.15*lv(4):1));S.gold+=g;const xg=Math.round(s.hp/2);S.xp+=xg;m='Victory! +'+g+' gold, +'+xg+' XP.';while(S.xp>=20*S.pl){S.xp-=20*S.pl;S.pl++;m+=' Level up! (Lv '+S.pl+': +3 HP, +3 stamina)'}
+const wl=[0,1,2,3,4,5,6,7].filter(i=>!S.own[i]),al=[0,1,2,3,4,5,6,7,8,9,10].filter(i=>!S.acc[i]);
+if(TEST||s.boss||Math.random()<.35){const ow=[0,1,2,3,4,5,6,7].filter(i=>S.own[i]&&S.lv[i]<5);if(wl.length&&(TEST||S.world<1||!ow.length||Math.random()<.5)){const i=wl[Math.floor(R(0,wl.length))];S.own[i]=1;m+=' Dropped weapon: '+TY[i].n+'.'}else if(TEST)m+=upg()}
+if(al.length&&(TEST||s.boss||Math.random()<.3)){const i=al[Math.floor(R(0,al.length))];S.acc[i]=1;m+=' Dropped accessory: '+ACC[i].n+'.'}else if(TEST)m+=upga()
+if(s.sb&&!S.own[8]){S.own[8]=1;S.pop=1;m+=' The Crimson Baron fell! Dropped: BLOOD DAGGER.'}if(s.boss&&!S.relic){S.relic=1;m+=' Dropped relic: Scouter (auto-equipped).'}if(++S.stage>=EN.length){S.stage=0;S.world++;m+=' World cleared! Enemies grow stronger.'}S.sb=S.stage===EN.length-1&&Math.random()<SBP?1:0}
+showPanel(m);if(S.pop){S.pop=0;pop()}}
+if(TEST){for(let i=9;i<=12;i++)S.own[i]=1;S.up[9][0]=4;S.up[10][1]=4;S.up[11][2]=4;S.up[12][3]=4;S.own[8]=1;S.up[8][4]=1000;S.ws=5;S.ld=[9,10,11,12,8];labels()}
+over=3;showPanel('Choose your loadout for the first fight.');
+addEventListener('keydown',e=>{const k=e.key.toLowerCase();
+if(/^[1-5]$/.test(k))pick(+k-1);else if(/^[zxcv]$/.test(k))thr(0,S.ld[sel],'zxcv'.indexOf(k));else if(k==='h'&&S.relic)S.rn=!S.rn;else if((k==='r'||k==='enter'||k===' ')&&over)go()});
+
+function loop(t){const dt=Math.min(.033,(t-lt)/1000||0);lt=t;upd(dt);draw();
+wbs.forEach((b,k)=>{const w=S.ld[k];b.style.opacity=w!==undefined&&(P.cd[w]>0||P.st<cost(w))?.45:1});[...ab.children].forEach((c,k)=>c.style.opacity=(S.eq[9]?k===3:S.eq[3]?(k<3||(TY[S.ld[sel]]||{}).boom):(TY[S.ld[sel]]||{}).arc===k)?1:.35);requestAnimationFrame(loop)}
+requestAnimationFrame(loop);
+</script></body></html>
