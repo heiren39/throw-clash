@@ -63,7 +63,7 @@ const dmg=i=>(TY[i].dm??TY[i].d)+S.up[i][0]+prism(),dur=i=>TY[i].d+S.up[i][1]+(S
 let P,E,pr,pt,pl=[],sk,over,ecd,sel=1,lt=0,begun=0;
 const R=(a,b)=>a+Math.random()*(b-a);
 let CM=1,TEST=0,SBP=.1;
-function reset(){const s=cur(),mh=30+3*(S.pl-1)+(S.eq[2]?8+4*lv(2):0)+3*prism(),sm=20+3*(S.pl-1)+3*prism(),eh=Math.round(s.hp*(1+.25*S.world)*(TEST?1:.75));
+function reset(){const s=cur(),mh=(TEST?30:20)+3*(S.pl-1)+(S.eq[2]?8+4*lv(2):0)+3*prism(),sm=20+3*(S.pl-1)+3*prism(),eh=Math.round(s.hp*(1+.25*S.world)*(TEST?1:.75));
 P={hp:mh,max:mh,st:sm,sx:sm,vc:{},cd:TY.map(()=>0),h:0,bn:0,bt:0,ps:0};E={hp:eh,max:eh,boss:s.boss?1:0,cd:TY.map(()=>0),h:0,bn:0,bt:0,ps:0,n:s.n+(s.boss?' (boss)':'')+(S.world?' ★'+S.world:'')};pr=[];pt=[];pl=[];sk=0;over=0;ecd=2}
 reset();over=3;
 function thr(o,ti,ai){const O=o?E:P,t=TY[ti],a=AR[ai];if(over||O.cd[ti]>0||(!o&&(!S.ld.includes(ti)||P.st<cost(ti)))||!(o?t.arc===ai:S.eq[9]?ai===3:S.eq[3]?(ai<3||t.boom):t.arc===ai))return;if(!o){P.st-=cost(ti);S.up[ti][4]++}O.cd[ti]=t.boom?999:t.cd*1.6*(o?1:[1,.85,.7,.55,.45][S.up[ti][3]])*(!o&&S.eq[1]?Math.max(.2,.8-.05*lv(1)):1);const T=a.T/t.sp,D=t.d+(o?0:S.up[ti][1]+(S.eq[0]?1+lv(0):0)+prism()+Math.floor(P.vc[ti]||0));if(!o)P.vc[ti]=0;
@@ -178,14 +178,14 @@ function endB(){let m='Defeated. Adjust your loadout and retry.';
 if(over===1){const s=cur(),g=Math.round(R(s.gold[0],s.gold[1])*(1+.25*S.world)*(S.eq[4]?1.25+.15*lv(4):1));S.gold+=g;const xg=Math.round(s.hp/2);S.xp+=xg;m='Victory! +'+g+' gold, +'+xg+' XP.';while(S.xp>=20*S.pl){S.xp-=20*S.pl;S.pl++;m+=' Level up! (Lv '+S.pl+': +3 HP, +3 stamina)'}
 const wl=[0,1,2,3,4,5,6,7].filter(i=>!S.own[i]),al=[0,1,2,3,4,5,6,7,8,9,10].filter(i=>!S.acc[i]);
 if(TEST||s.boss||Math.random()<.35){const ow=[0,1,2,3,4,5,6,7].filter(i=>S.own[i]&&S.lv[i]<5);if(wl.length&&(TEST||S.world<1||!ow.length||Math.random()<.5)){const i=wl[Math.floor(R(0,wl.length))];S.own[i]=1;m+=' Dropped weapon: '+TY[i].n+'.'}else if(TEST)m+=upg()}
-if(al.length&&(TEST||s.boss||Math.random()<.3)){const i=al[Math.floor(R(0,al.length))];S.acc[i]=1;m+=' Dropped accessory: '+ACC[i].n+'.'}else if(TEST)m+=upga()
+if(!TEST&&!s.boss&&s===EN[0]&&!S.acc[0]){S.acc[0]=1;m+=' Dropped accessory: Whetstone (guaranteed from the first enemy).'}else if(al.length&&(TEST||s.boss||Math.random()<.3)){const i=al[Math.floor(R(0,al.length))];S.acc[i]=1;m+=' Dropped accessory: '+ACC[i].n+'.'}else if(TEST)m+=upga()
 if(s.sb&&!S.own[8]){S.own[8]=1;S.pop=1;m+=' The Crimson Baron fell! Dropped: BLOOD DAGGER.'}if(s.boss&&!S.relic){S.relic=1;m+=' Dropped relic: Scouter (auto-equipped).';gpush('Relic obtained: Scouter','See the strength (hp) of living creatures.')}if(s.sb&&!S.alb){S.alb=1;m+=' Dropped relic: Treasure Almanac.';gpush('Relic obtained: Treasure Almanac','Describes enemy treasures and their rarity.')}if(RF){RF=null;m+=' Re-fight complete — world progress unchanged.'}else{if(++S.stage>=EN.length){S.stage=0;S.world++;m+=' World cleared! Enemies grow stronger.'}S.sb=S.stage===EN.length-1&&Math.random()<SBP?1:0}}
 showPanel(m);if(S.pop){S.pop=0;pop()}else gnext()}
 function startGame(m){
 TEST=m==='test';CM=TEST?.1:1;SBP=TEST?.5:.1;
 UC=UC.map(r=>r.map(v=>Math.max(1,Math.round(v*CM))));
 if(TEST){for(let i=9;i<=12;i++)S.own[i]=1;S.up[9][0]=4;S.up[10][1]=4;S.up[11][2]=4;S.up[12][3]=4;S.own[8]=1;S.up[8][4]=1000;S.ws=5;S.ld=[9,10,11,12,8];S.alb=1;S.ral='b';S.relic=1;S.rv=1;S.rn=1}
-else{S.own=[1,0,0,0,0,0,0,0,0,0,0,0,0];S.ld=[0];S.ws=3;S.sa=1}
+else{S.own=[1,0,0,0,0,0,0,0,0,0,0,0,0];S.ld=[0];S.ws=3;S.sa=1;S.acc=ACC.map(()=>0);S.eq=ACC.map(()=>0);S.al=ACC.map(()=>0)}
 labels();begun=1;over=3;showPanel('Choose your loadout for the first fight.')}
 const md=document.getElementById('mode');
 md.querySelectorAll('button').forEach(b=>b.onclick=()=>{md.style.display='none';startGame(b.dataset.m)});
